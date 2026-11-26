@@ -1,0 +1,5 @@
+{
+  "name": "05 - Kiểm thử lỗi: 3 ảnh không chồng lấn (Negative Test)",
+  "description": "Gồm 3 ảnh từ 3 địa điểm hoàn toàn khác nhau nhằm kiểm chứng xử lý lỗi an toàn.",
+  "expected_error": true
+}

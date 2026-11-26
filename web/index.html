@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PanoramaStudio — Hệ thống Ghép ảnh Toàn cảnh | Xử lý ảnh số</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 15.5L7.5 10.5L12 14.5L15.5 11.5L22 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="8" cy="8.5" r="1.4" fill="currentColor"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">PanoramaStudio</div>
+        <div class="brand-sub">Hệ thống Ghép ảnh Toàn cảnh — Bài tập lớn môn Xử lý ảnh số</div>
+      </div>
+    </div>
+
+    <nav class="main-nav">
+      <button class="nav-btn active" data-view="studio">Ghép ảnh (Studio)</button>
+      <button class="nav-btn" data-view="benchmarks">Thực nghiệm &amp; Đánh giá</button>
+      <button class="nav-btn" data-view="architecture">Kiến trúc Thuật toán</button>
+    </nav>
+
+    <div class="header-badges">
+      <span class="pill pill-emerald">4/6 Mô-đun Tự Cài Đặt (NumPy)</span>
+    </div>
+  </header>
+
+  <!-- ================= VIEW 1: STUDIO ================= -->
+  <main id="view-studio" class="view active">
+    <aside class="sidebar">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>1. Chọn ảnh đầu vào (2–10 ảnh)</h2>
+          <button id="btn-clear-images" class="btn-ghost btn-xs" type="button">Xóa hết</button>
+        </div>
+
+        <label class="dropzone" id="dropzone" for="file-input">
+          <input id="file-input" type="file" accept="image/*" multiple hidden />
+          <div class="dropzone-icon">⬆</div>
+          <div class="dropzone-text">Kéo thả hoặc bấm để chọn 2–10 ảnh</div>
+          <div class="dropzone-hint">Hỗ trợ JPG, PNG, WEBP — độ chồng lấn khuyến nghị 25–50%</div>
+        </label>
+
+        <div class="sample-section">
+          <div class="sub-label">Hoặc nạp nhanh bộ dữ liệu kiểm thử (không bản quyền):</div>
+          <div id="dataset-list" class="dataset-pills"></div>
+        </div>
+
+        <div id="filmstrip-wrap" class="filmstrip-wrap hidden">
+          <div class="sub-label-row">
+            <span id="selected-count">Đã chọn 0 ảnh</span>
+            <span class="muted-xs">Bấm ◀ ▶ để đổi thứ tự</span>
+          </div>
+          <div id="filmstrip" class="filmstrip"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>2. Cấu hình Pipeline Thuật toán</h2>
+          <button id="btn-reset-cfg" class="btn-ghost btn-xs" type="button">Mặc định</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="cfg-detector">Phát hiện đặc trưng (Detector)</label>
+            <select id="cfg-detector">
+              <option value="sift" selected>SIFT (Chính xác cao, bất biến tỷ lệ)</option>
+              <option value="orb">ORB (Nhanh, descriptor nhị phân)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="cfg-matcher">Khớp đặc trưng (Matcher)</label>
+            <select id="cfg-matcher">
+              <option value="custom" selected>Tự cài đặt — NumPy k-NN + Lowe's Ratio</option>
+              <option value="opencv">OpenCV — BFMatcher (Đối chiếu)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="cfg-homography">Ước lượng Homography</label>
+            <select id="cfg-homography">
+              <option value="custom" selected>Tự cài đặt — Normalized DLT + RANSAC + LM</option>
+              <option value="opencv">OpenCV — cv2.findHomography (Đối chiếu)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="cfg-projection">Phép chiếu hình học (Projection)</label>
+            <select id="cfg-projection">
+              <option value="planar" selected>Chiếu phẳng (Planar Homography)</option>
+              <option value="cylindrical">Chiếu mặt trụ (Cylindrical — Tự cài đặt)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="cfg-blending">Kỹ thuật Trộn ảnh (Blending — Điểm nhấn)</label>
+            <select id="cfg-blending">
+              <option value="seam_multiband" selected>DP Seam + Multi-Band Pyramid (Tự cài đặt)</option>
+              <option value="multiband">Multi-Band Laplacian Pyramid (Tự cài đặt)</option>
+              <option value="feather">Feather — Distance Transform (Tự cài đặt)</option>
+              <option value="none">Cắt cứng — Hard Cut (Baseline so sánh)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toggles">
+          <label class="toggle-item">
+            <input type="checkbox" id="cfg-auto-order" checked />
+            <span>Tự động sắp xếp thứ tự ảnh (Auto-Order MST)</span>
+          </label>
+          <label class="toggle-item">
+            <input type="checkbox" id="cfg-exposure" checked />
+            <span>Cân bằng phơi sáng toàn cục (Gain Compensation)</span>
+          </label>
+          <label class="toggle-item">
+            <input type="checkbox" id="cfg-auto-crop" checked />
+            <span>Cắt biên đen tự động (Largest Inscribed Rect)</span>
+          </label>
+          <label class="toggle-item">
+            <input type="checkbox" id="cfg-visuals" checked />
+            <span>Xuất ảnh trung gian (Keypoints, Matches, Seam)</span>
+          </label>
+        </div>
+
+        <details class="advanced-box">
+          <summary>Tham số nâng cao (Ratio, RANSAC, Pyramid)</summary>
+          <div class="slider-row">
+            <label>Lowe's Ratio Threshold: <strong id="val-ratio">0.75</strong></label>
+            <input type="range" id="cfg-ratio" min="0.55" max="0.90" step="0.01" value="0.75" />
+          </div>
+          <div class="slider-row">
+            <label>Ngưỡng sai số RANSAC (px): <strong id="val-ransac">4.0</strong></label>
+            <input type="range" id="cfg-ransac" min="1.5" max="10.0" step="0.5" value="4.0" />
+          </div>
+          <div class="slider-row">
+            <label>Số tầng tháp Multi-Band: <strong id="val-levels">5</strong></label>
+            <input type="range" id="cfg-levels" min="3" max="6" step="1" value="5" />
+          </div>
+          <div class="slider-row">
+            <label>Góc nhìn trụ FOV (°): <strong id="val-fov">55</strong></label>
+            <input type="range" id="cfg-fov" min="35" max="90" step="5" value="55" />
+          </div>
+        </details>
+
+        <button id="btn-stitch" class="btn-primary" type="button" disabled>
+          Bắt đầu Ghép ảnh Toàn cảnh
+        </button>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <!-- Progress Banner -->
+      <div id="progress-card" class="progress-card hidden">
+        <div class="progress-top">
+          <div>
+            <div class="progress-title" id="progress-title">Đang xử lý ghép ảnh toàn cảnh...</div>
+            <div class="progress-msg" id="progress-msg">Đang khởi tạo pipeline...</div>
+          </div>
+          <div class="progress-pct" id="progress-pct">0%</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="stage-steps" id="stage-steps">
+          <span data-stage="features">1. Đặc trưng</span>
+          <span data-stage="matching">2. Khớp &amp; RANSAC</span>
+          <span data-stage="warping">3. Warping</span>
+          <span data-stage="blending">4. Trộn ảnh</span>
+          <span data-stage="postprocess">5. Cắt biên</span>
+          <span data-stage="done">6. Hoàn tất</span>
+        </div>
+      </div>
+
+      <!-- Error Banner -->
+      <div id="error-card" class="error-card hidden">
+        <div class="error-badge" id="error-code">ERROR</div>
+        <div class="error-body">
+          <h3 id="error-message">Không thể ghép bộ ảnh</h3>
+          <p id="error-suggestion"></p>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state">
+        <div class="empty-graphic">
+          <svg width="68" height="68" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="4" width="20" height="16" rx="3" stroke="#38bdf8" stroke-width="1.5"/>
+            <path d="M2 16L7.5 11L12 15L16.5 10L22 15.5" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="8.5" r="1.5" fill="#38bdf8"/>
+          </svg>
+        </div>
+        <h2>Sẵn sàng tạo ảnh Toàn cảnh liền mạch</h2>
+        <p>
+          Chọn <strong>2–10 ảnh chồng lấn</strong> từ máy tính hoặc bấm vào một trong <strong>5 bộ dữ liệu mẫu</strong> bên trái,
+          sau đó nhấn <strong>Bắt đầu Ghép ảnh Toàn cảnh</strong>.
+        </p>
+        <div class="feature-highlights">
+          <div class="hl-card">
+            <span class="hl-tag">Tự cài đặt #1</span>
+            <strong>NumPy k-NN &amp; Lowe's Ratio</strong>
+            <span>Tính khoảng cách ma trận L2/Hamming vector hóa.</span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-tag">Tự cài đặt #2</span>
+            <strong>Normalized DLT + RANSAC + LM</strong>
+            <span>Độ chính xác subpixel &amp; tự sắp xếp thứ tự bằng MST.</span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-tag">Tự cài đặt #3</span>
+            <strong>Gain + DP Seam + Multi-Band</strong>
+            <span>Cân bằng sáng, né vật chuyển động và trộn đa dải tần.</span>
+          </div>
+          <div class="hl-card">
+            <span class="hl-tag">Tự cài đặt #4</span>
+            <strong>Largest Rectangle Auto-Crop</strong>
+            <span>Loại bỏ hoàn toàn viền đen bằng thuật toán O(H·W).</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result Workspace -->
+      <div id="result-area" class="result-area hidden">
+        <div class="result-header">
+          <div class="result-tabs">
+            <button class="subtab active" data-subtab="panorama">Ảnh Toàn cảnh</button>
+            <button class="subtab" data-subtab="intermediates">Các bước Trung gian</button>
+            <button class="subtab" data-subtab="profiling">Chỉ số &amp; Thời gian</button>
+          </div>
+          <div class="download-actions">
+            <a id="dl-png" class="btn-outline" download>Tải PNG</a>
+            <a id="dl-jpg" class="btn-outline" download>Tải JPG (95%)</a>
+            <a id="dl-zip" class="btn-accent" download>Tải Gói Báo cáo (.ZIP)</a>
+          </div>
+        </div>
+
+        <!-- KPI Strip -->
+        <div class="kpi-strip" id="kpi-strip"></div>
+
+        <!-- Subtab 1: Panorama Viewer -->
+        <div id="subtab-panorama" class="subtab-pane active">
+          <div class="viewer-toolbar">
+            <div class="toolbar-group">
+              <button class="btn-chip active" id="mode-final">Ảnh Hoàn chỉnh</button>
+              <button class="btn-chip" id="mode-uncropped">Chưa cắt biên</button>
+              <button class="btn-chip" id="mode-compare">So sánh Cắt biên (Kéo thanh)</button>
+            </div>
+            <div class="toolbar-group">
+              <span class="muted-xs">Thu phóng:</span>
+              <input type="range" id="zoom-slider" min="50" max="220" step="10" value="100" />
+              <span id="zoom-label" class="zoom-label">100%</span>
+            </div>
+          </div>
+
+          <div class="viewer-stage" id="viewer-stage">
+            <img id="pano-img" alt="Ảnh toàn cảnh kết quả" />
+            <div id="compare-wrap" class="compare-wrap hidden">
+              <img id="cmp-base" class="cmp-img" alt="Trước khi cắt biên" />
+              <div id="cmp-overlay" class="cmp-overlay">
+                <img id="cmp-top" class="cmp-img" alt="Sau khi cắt biên" />
+              </div>
+              <div id="cmp-handle" class="cmp-handle">
+                <div class="cmp-knob">⇄</div>
+              </div>
+              <span class="cmp-badge cmp-left">Sau cắt biên (Auto-Crop)</span>
+              <span class="cmp-badge cmp-right">Trước cắt biên (Full Canvas)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtab 2: Intermediate Steps -->
+        <div id="subtab-intermediates" class="subtab-pane">
+          <div id="intermediates-content" class="intermediates-content"></div>
+        </div>
+
+        <!-- Subtab 3: Profiling & Tables -->
+        <div id="subtab-profiling" class="subtab-pane">
+          <div class="profiling-grid">
+            <div class="card">
+              <h3>Phân rã thời gian từng bước (ms)</h3>
+              <div id="timing-bars" class="timing-bars"></div>
+            </div>
+            <div class="card">
+              <h3>Hệ số cân bằng sáng (Exposure Gains — B, G, R)</h3>
+              <div id="gains-table"></div>
+            </div>
+            <div class="card full-span">
+              <h3>Chi tiết các cặp ghép trong Cây khung cực đại (MST Pairs)</h3>
+              <div id="pairs-table"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= VIEW 2: BENCHMARKS ================= -->
+  <main id="view-benchmarks" class="view">
+    <div class="container-wide">
+      <div class="section-intro">
+        <h1>Kết quả Thực nghiệm &amp; Đánh giá Định lượng</h1>
+        <p>Tổng hợp kết quả đo đạc thực tế trên 5 bộ dữ liệu kiểm thử (4 bối cảnh hợp lệ + 1 bộ kiểm thử lỗi), đối chiếu thuật toán Tự cài đặt với OpenCV và so sánh 4 kỹ thuật Trộn ảnh.</p>
+      </div>
+      <div id="benchmark-body" class="benchmark-body">
+        <div class="muted">Đang tải dữ liệu thực nghiệm...</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= VIEW 3: ARCHITECTURE ================= -->
+  <main id="view-architecture" class="view">
+    <div class="container-wide">
+      <div class="section-intro">
+        <h1>Kiến trúc Modular &amp; Các Thuật toán Cốt lõi Tự cài đặt</h1>
+        <p>Hệ thống được tổ chức thành 6 mô-đun độc lập trong <code>src/panorama/</code>, trong đó 4/6 khối cốt lõi được tự lập trình hoàn toàn bằng Python/NumPy/SciPy (vượt xa mức yêu cầu tối thiểu 2/5 bước).</p>
+      </div>
+      <div class="arch-img-box">
+        <img src="/results-files/charts/architecture_diagram.png" alt="Sơ đồ kiến trúc 6 bước" onerror="this.style.display='none'" />
+      </div>
+      <div class="arch-cards">
+        <div class="card">
+          <span class="pill pill-sky">Module 1 · features.py</span>
+          <h3>Phát hiện &amp; Khớp đặc trưng</h3>
+          <p>Trích xuất đặc trưng SIFT / ORB với cơ chế <em>scale-aware detection</em> (tăng tốc gấp 3× trên ảnh Full HD mà vẫn giữ tọa độ subpixel gốc). Bộ khớp <strong>Tự cài đặt bằng NumPy thuần</strong> tính ma trận khoảng cách bình phương Euclid / Hamming theo khối (chunked BLAS matmul), tìm 2 láng giềng gần nhất bằng <code>np.argpartition</code> và áp dụng <strong>Lowe's Ratio Test</strong> + tùy chọn Cross-Check 2 chiều.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-emerald">Module 2 · homography.py</span>
+          <h3>Normalized DLT + Adaptive RANSAC + LM</h3>
+          <p><strong>Tự cài đặt 100% bằng NumPy</strong>: chuẩn hóa điểm đẳng hướng Hartley (tâm 0, bán kính trung bình √2), giải DLT bằng SVD lấy không gian hạch chính xác, kiểm tra suy biến 3 điểm thẳng hàng, chạy Adaptive RANSAC với hàm mất mát MSAC tự động cập nhật số vòng lặp tối đa, cuối cùng tinh chỉnh phi tuyến <strong>Levenberg-Marquardt</strong> bằng ma trận Jacobian giải tích 8 bậc tự do.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-emerald">Module 3 · ordering.py</span>
+          <h3>Tự sắp xếp thứ tự ảnh (Auto-Order MST)</h3>
+          <p>Xây dựng đồ thị khớp cặp trên toàn bộ tập ảnh tải lên theo thứ tự bất kỳ. Dùng thuật toán <strong>Kruskal</strong> tìm Cây khung lớn nhất (MST) theo số inliers, phát hiện ảnh rời rạc không chồng lấn để báo lỗi thân thiện, chọn ảnh trung tâm (eccentricity nhỏ nhất) làm gốc tham chiếu giúp giảm 50% méo phối cảnh về hai biên.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-sky">Module 4 · warping.py</span>
+          <h3>Biến đổi Phối cảnh &amp; Chiếu trụ</h3>
+          <p>Chuỗi hóa Homography toàn cục về ảnh gốc, tính khung canvas an toàn có cơ chế bảo vệ chống tràn bộ nhớ, hỗ trợ cả <strong>Chiếu phẳng (Planar)</strong> và <strong>Chiếu trụ (Cylindrical Projection tự cài đặt)</strong> kèm co nhẹ mặt nạ 1px để triệt tiêu viền đen nội suy.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-amber">Module 5 · blending.py (Điểm nhấn)</span>
+          <h3>Cân bằng sáng, DP Seam &amp; Tháp Laplacian</h3>
+          <p><strong>Tự cài đặt 100%</strong>: (1) Giải hệ tuyến tính bình phương tối thiểu tìm hệ số gain phơi sáng theo Brown &amp; Lowe (2007); (2) Tìm đường cắt năng lượng cực tiểu bằng <strong>Quy hoạch động (DP)</strong> theo sai khác màu + gradient Sobel giúp né vật chuyển động chống ghosting; (3) Trộn <strong>Đa dải tần (Multi-Band Laplacian Pyramid — Burt &amp; Adelson 1983)</strong> bằng tích chập Gaussian tách rời 5 điểm với ngoại suy biên chống quầng tối.</p>
+        </div>
+        <div class="card">
+          <span class="pill pill-emerald">Module 6 · postprocess.py</span>
+          <h3>Cắt biên tự động (Largest Inscribed Rect)</h3>
+          <p><strong>Tự cài đặt 100%</strong>: tìm hình chữ nhật nội tiếp lớn nhất nằm hoàn toàn trong vùng pixel hợp lệ bằng thuật toán ngăn xếp đơn điệu <code>O(H·W)</code> trên mặt nạ co bảo thủ, loại bỏ hoàn toàn các góc tam giác đen mà vẫn giữ tối đa &gt;90% diện tích ảnh thật.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Lightbox Modal -->
+  <div id="lightbox" class="lightbox hidden">
+    <button id="lightbox-close" class="lightbox-close" aria-label="Đóng">✕</button>
+    <img id="lightbox-img" alt="Xem phóng to" />
+    <div id="lightbox-caption" class="lightbox-caption"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
